@@ -23,6 +23,7 @@ import yaml
 from shutil import copyfile
 import pandas as pd
 import tqdm
+import wandb
 
 from pytorch_metric_learning import losses, miners
 
@@ -126,6 +127,8 @@ opt = parser.parse_args()
 if opt.label_smoothing > 0.0 and version[0] < 1 or version[1] < 10:
     warnings.warn(
         "Label smoothing is supported only from torch 1.10.0, the parameter will be ignored")
+
+run = wandb.init(project="train-try", config=opt)
 
 
 ######################################################################
@@ -474,6 +477,8 @@ def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
 
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
                 phase, epoch_loss.item(), epoch_acc.item()))
+
+            wandb.log({f'{phase}_loss': epoch_loss.item(), f'{phase}_acc': epoch_acc.item()}, commit=(phase == 'val'))
 
             y_loss[phase].append(epoch_loss)
             y_err[phase].append(1.0 - epoch_acc)
