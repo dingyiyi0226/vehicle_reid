@@ -184,6 +184,8 @@ def train(opt):
     if type(opt) == dict:
         # merge config from default args
 
+        print("Merge config from dict")
+
         parser = arg_parser("Retraining")
         default_opt = parser.parse_args()
         config_dict = vars(default_opt)
