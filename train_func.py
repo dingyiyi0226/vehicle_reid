@@ -192,9 +192,9 @@ def train(opt):
         config_dict.update(opt)
         opt = parser.parse_args(namespace=argparse.Namespace(**config_dict))
 
-    print(opt)
-    return
-    run = wandb.init(project="train-try", config=opt)
+    else:
+        # only init wandb if run training script separately
+        run = wandb.init(project="train-try", config=opt)
 
     ######################################################################
     # Configure devices
