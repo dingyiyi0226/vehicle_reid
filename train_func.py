@@ -31,14 +31,13 @@ version = list(map(int, torch.__version__.split(".")[:2]))
 torchvision_version = list(map(int, torchvision.__version__.split(".")[:2]))
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(SCRIPT_DIR)
+# sys.path.append(SCRIPT_DIR)
 
-from random_erasing import RandomErasing
-from circle_loss import CircleLoss, convert_label_to_similarity
-from instance_loss import InstanceLoss
-from load_model import load_model_from_opts
-from dataset import ImageDataset, BatchSampler
-
+from reid.vehicle_reid.random_erasing import RandomErasing
+from reid.vehicle_reid.circle_loss import CircleLoss, convert_label_to_similarity
+from reid.vehicle_reid.instance_loss import InstanceLoss
+from reid.vehicle_reid.load_model import load_model_from_opts
+from reid.vehicle_reid.dataset import ImageDataset, BatchSampler
 
 def arg_parser(description):
 
@@ -121,7 +120,7 @@ def arg_parser(description):
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--debug_period", type=int, default=100,
                         help="Print the loss and grad statistics for *this many* batches at a time.")
-    opt = parser.parse_args()
+    opt, _ = parser.parse_known_args()
 
     if opt.train_csv_path is None:
         warnings.warn("Train_csv_path not given")
@@ -151,6 +150,28 @@ class DebugInfo:
             print(pd.Series(self.history).describe())
             self.history = []
 
+class DrawCurve:
+    def __init__(self, name):
+        self.name = name
+        self.x_epoch = []
+        self.fig = plt.figure()
+        self.ax_loss = self.fig.add_subplot(121, title="loss")
+        self.ax_top1err = self.fig.add_subplot(122, title="top1err")
+
+    def draw(self, epoch, script_dir, y_loss, y_err):
+        self.x_epoch.append(epoch)
+
+        self.ax_loss.plot(self.x_epoch, y_loss['train'], 'bo-', label='train')
+        self.ax_loss.plot(self.x_epoch, y_loss['val'], 'ro-', label='val')
+        self.ax_top1err.plot(self.x_epoch, y_err['train'], 'bo-', label='train')
+        self.ax_top1err.plot(self.x_epoch, y_err['val'], 'ro-', label='val')
+        if epoch == 0:
+            self.ax_loss.legend()
+            self.ax_top1err.legend()
+
+        self.fig.savefig(os.path.join(script_dir, "model", self.name, 'train.jpg'))
+
+
 def fliplr(img):
     """flip a batch of images horizontally"""
     inv_idx = torch.arange(img.size(3) - 1, -1, -
@@ -165,20 +186,6 @@ def save_network(network, epoch_label, name):
     torch.save(network.cpu().state_dict(), save_path)
     network.to(device)
 
-def draw_curve(current_epoch, name):
-    global x_epoch, y_loss, y_err, fig, ax_loss, ax_top1err
-
-    x_epoch.append(current_epoch)
-    ax_loss.plot(x_epoch, y_loss['train'], 'bo-', label='train')
-    ax_loss.plot(x_epoch, y_loss['val'], 'ro-', label='val')
-    ax_top1err.plot(x_epoch, y_err['train'], 'bo-', label='train')
-    ax_top1err.plot(x_epoch, y_err['val'], 'ro-', label='val')
-    if current_epoch == 0:
-        ax_loss.legend()
-        ax_top1err.legend()
-    fig.savefig(os.path.join(SCRIPT_DIR, "model", name, 'train.jpg'))
-
-
 def train(opt):
 
     if type(opt) == dict:
@@ -187,10 +194,11 @@ def train(opt):
         print("Merge config from dict")
 
         parser = arg_parser("Retraining")
-        default_opt = parser.parse_args()
-        config_dict = vars(default_opt)
-        config_dict.update(opt)
-        opt = parser.parse_args(namespace=argparse.Namespace(**config_dict))
+
+        opt, _ = parser.parse_known_args(namespace=argparse.Namespace(**opt))
+
+        print("Training Opts:")
+        print(opt)
 
     else:
         # only init wandb if run training script separately
@@ -305,10 +313,7 @@ def train(opt):
     # Draw Curve
     # ---------------------------
 
-    x_epoch = []
-    fig = plt.figure()
-    ax_loss = fig.add_subplot(121, title="loss")
-    ax_top1err = fig.add_subplot(122, title="top1err")
+    result_fig = DrawCurve(name=opt.name)
 
     ######################################################################
     # Save opts and load model
@@ -562,7 +567,9 @@ def train(opt):
                     if not use_tpu or opt.tpu_cores == 1 or xm.is_master_ordinal():
                         if epoch == num_epochs - 1 or (epoch % (opt.save_freq) == (opt.save_freq - 1)):
                             save_network(model, epoch, opt.name)
-                        draw_curve(epoch, opt.name)
+
+                        result_fig.draw(epoch, SCRIPT_DIR, y_loss, y_err)
+
                 if phase == 'train':
                     scheduler.step()
 
@@ -615,6 +622,17 @@ def train(opt):
 
 if __name__ == '__main__':
 
-    parser = arg_parser("Training")
-    opt = parser.parse_args()
+    # parser = arg_parser("Training")
+
+    opt = {
+        "name": "testname",
+        "train_csv_path": "test",
+        "val_csv_path": "test",
+
+        "batchsize": 16,
+        "mixstyle": "True",
+        "contrast": "True",
+    }
+
+    # opt = parser.parse_args()
     train(opt)
