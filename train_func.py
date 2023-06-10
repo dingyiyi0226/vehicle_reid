@@ -200,9 +200,9 @@ def train(opt):
         print("Training Opts:")
         print(opt)
 
-    else:
-        # only init wandb if run training script separately
-        run = wandb.init(project="train-try", config=opt)
+    # else:
+    # only init wandb if run training script separately
+    run = wandb.init(project="train-try", config=opt)
 
     ######################################################################
     # Configure devices
@@ -239,6 +239,7 @@ def train(opt):
             print("Running on CPU ...")
         else:
             print("Running on cuda:{}".format(gpu_ids[0]))
+            print(gpu_ids, type(gpu_ids[0]))
             torch.cuda.set_device(gpu_ids[0])
             cudnn.benchmark = True
 
@@ -584,8 +585,10 @@ def train(opt):
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(
             time_elapsed // 60, time_elapsed % 60))
-        return model
 
+        run.finish()
+
+        return model
 
     def tpu_map_fn(index, flags):
         """ Thread initialization function for TPU processes """
