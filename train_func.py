@@ -188,6 +188,9 @@ def save_network(network, epoch_label, name):
 
 def train(opt):
 
+    print("Device countsp:", torch.cuda.device_count())
+    print("Currentsp:", torch.cuda.current_device())
+
     if type(opt) == dict:
         # merge config from default args
 
@@ -224,6 +227,7 @@ def train(opt):
 
         use_tpu, use_gpu = True, False
         print("Running on TPU ...")
+        device = xm.xla_device()
     else:
         gpu_ids = []
         if opt.gpu_ids:
@@ -237,10 +241,14 @@ def train(opt):
         use_gpu = torch.cuda.is_available() and len(gpu_ids) > 0
         if not use_gpu:
             print("Running on CPU ...")
+            device = torch.device("cpu")
         else:
             print("Running on cuda:{}".format(gpu_ids[0]))
             print(gpu_ids, type(gpu_ids[0]))
-            torch.cuda.set_device(gpu_ids[0])
+            print("Device count:", torch.cuda.device_count())
+            print("Current:", torch.cuda.current_device())
+            device = torch.device(f"cuda:{gpu_ids[0]}")
+            # torch.cuda.set_device(gpu_ids[0])
             cudnn.benchmark = True
 
     ######################################################################
@@ -348,12 +356,6 @@ def train(opt):
 
     def train_model(model, criterion, start_epoch=0, num_epochs=25, num_workers=2):
         since = time.time()
-        if use_tpu:
-            device = xm.xla_device()
-        elif use_gpu:
-            device = torch.device("cuda")
-        else:
-            device = torch.device("cpu")
 
         model = model.to(device)
         if fp16:
@@ -628,9 +630,16 @@ if __name__ == '__main__':
     # parser = arg_parser("Training")
 
     opt = {
-        "name": "testname",
-        "train_csv_path": "test",
-        "val_csv_path": "test",
+        "name": "test",
+        "train_csv_path": "datasets/annot/c001_0_800_train.txt",
+        "val_csv_path": "datasets/annot/c001_0_800_val.txt",
+
+        "checkpoint": "model/test/net_19.pth",
+        "gpu_ids": "1",
+
+        "save_freq": 2,
+        "total_epoch": 25,
+        "start_epoch": 20,
 
         "batchsize": 16,
         "mixstyle": "True",
